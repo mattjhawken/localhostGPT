@@ -5,9 +5,15 @@ import { BrowserWindow, app, ipcMain, shell } from 'electron'
 import { join } from 'path'
 import icon from '../../resources/icon.png?asset'
 
+const { spawn } = require('child_process')
+const path = require('path')
+
+let mainWindow: BrowserWindow
+let fastApiProcess
+
 function createWindow(): void {
   // Create the browser window.
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
     show: false,
@@ -27,6 +33,22 @@ function createWindow(): void {
     }
   })
 
+  fastApiProcess = spawn('python', [path.join(__dirname, '../../backend/app.py')])
+
+  fastApiProcess.stdout?.on('data', (data) => {
+    console.log(`FastAPI: ${data}`)
+  })
+
+  fastApiProcess.stderr?.on('data', (data) => {
+    console.error(`FastAPI Error: ${data}`)
+  })
+
+  app.on('before-quit', () => {
+    if (fastApiProcess) {
+      fastApiProcess.kill() // Ensure FastAPI stops when Electron closes
+    }
+  })
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
@@ -35,6 +57,8 @@ function createWindow(): void {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
+
+  mainWindow.webContents.openDevTools()
 
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.

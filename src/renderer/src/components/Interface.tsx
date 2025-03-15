@@ -13,6 +13,8 @@ import { ChatContent } from '@shared/models'
 import { useSetAtom } from 'jotai'
 import { useEffect, useRef, useState } from 'react'
 
+const API_URL = 'http://127.0.0.1:5000/api'
+
 interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
@@ -23,7 +25,13 @@ interface ChatSettings {
   modelName: string
   temperature: number
   maxTokens: number
-  isTensorLinkConnected: boolean
+  isTensorlinkConnected: boolean
+}
+
+interface Model {
+  id: string
+  name: string
+  requires_tensorlink: boolean
 }
 
 export const Interface = () => {
@@ -33,6 +41,10 @@ export const Interface = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [availableModels, setAvailableModels] = useState<Model[]>([])
+  const [isConnectingTensorlink, setIsConnectingTensorlink] = useState(false)
+  const [showTensorlinkModal, setShowTensorlinkModal] = useState(false)
+  const [fineTuningJobs, setFineTuningJobs] = useState<Record<string, any>>({})
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
@@ -43,19 +55,14 @@ export const Interface = () => {
     modelName: 'default-model',
     temperature: 0.7,
     maxTokens: 1024,
-    isTensorLinkConnected: false
+    isTensorlinkConnected: false
   })
 
-  // Available models
-  const availableModels = [
-    { id: 'default-model', name: 'Default Model' },
-    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
-    { id: 'gpt-4', name: 'GPT-4' },
-    { id: 'claude-3-opus', name: 'Claude 3 Opus' },
-    { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet' },
-    { id: 'llama-3-70b', name: 'Llama 3 70B' },
-    { id: 'mistral-large', name: 'Mistral Large' }
-  ]
+  // Fetch available models and tensorlink status
+  useEffect(() => {
+    fetchModels()
+    checkTensorlinkStatus()
+  }, [])
 
   // Initialize messages when selected chat changes
   useEffect(() => {
@@ -146,25 +153,183 @@ export const Interface = () => {
     await saveChat(content)
   }
 
-  const connectToTensorLink = () => {
-    // Placeholder for TensorLink connection logic
-    setChatSettings({
-      ...chatSettings,
-      isTensorLinkConnected: !chatSettings.isTensorLinkConnected
-    })
-
-    // Add system message about connection status
-    const connectionMessage: Message = {
-      role: 'system',
-      content: chatSettings.isTensorLinkConnected
-        ? 'Disconnected from TensorLink.'
-        : 'Connected to TensorLink. Enhanced model capabilities are now available.',
-      timestamp: Date.now()
+  // Fetch available models from API
+  const fetchModels = async () => {
+    try {
+      const response = await fetch(`${API_URL}/models`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch models: ${response.status}`)
+      }
+      const models = await response.json()
+      setAvailableModels(models)
+    } catch (error) {
+      console.error(`Error fetching models:`, error)
+      setAvailableModels([
+        { id: 'default-model', name: 'Default Model', requires_tensorlink: false }
+      ])
     }
+  }
 
-    const updatedMessages = [...messages, connectionMessage]
-    setMessages(updatedMessages)
-    saveMessages(updatedMessages)
+  // Check Tensorlink connection status
+  const checkTensorlinkStatus = async () => {
+    try {
+      const response = await fetch(`${API_URL}/tensorlink/status`)
+      if (!response.ok) {
+        throw new Error(`Failed to check Tensorlink status: ${response.status}`)
+      }
+      const data = await response.json()
+      setChatSettings((prev) => ({ ...prev, isTensorlinkConnected: data.connected }))
+
+      // Refresh models after checking Tensorlink status
+      fetchModels()
+    } catch (error) {
+      console.error('Error checking Tensorlink status:', error)
+    }
+  }
+
+  const connectToTensorlink = async () => {
+    // Placeholder for Tensorlink connection logic
+    try {
+      setIsConnectingTensorlink(true)
+      const response = await fetch(`${API_URL}/tensorlink/connect`)
+
+      if (!response.ok) {
+        throw new Error(`Failed to connect to Tensorlink: ${response.status}`)
+      }
+
+      const data = await response.json()
+      setChatSettings((prev) => ({ ...prev, isTensorlinkConnected: true }))
+
+      // Add system message about connection status
+      const connectionMessage: Message = {
+        role: 'system',
+        content: chatSettings.isTensorlinkConnected
+          ? 'Disconnected from Tensorlink.'
+          : 'Connected to Tensorlink. Enhanced model capabilities are now available.',
+        timestamp: Date.now()
+      }
+
+      const updatedMessages = [...messages, connectionMessage]
+      setMessages(updatedMessages)
+      saveMessages(updatedMessages)
+      setShowTensorlinkModal(false)
+
+      // Refresh available models
+      fetchModels()
+    } catch (error) {
+      console.error(`Error connecting to Tensorlink:`, error)
+      const errorMessage: Message = {
+        role: 'system',
+        content: 'Error: Could not connect to Tensorlink.',
+        timestamp: Date.now()
+      }
+
+      const updatedMessages = [...messages, errorMessage]
+      setMessages(updatedMessages)
+      saveMessages(updatedMessages)
+    } finally {
+      setIsConnectingTensorlink(false)
+    }
+  }
+
+  // Initiate fine-tuning
+  const initiateFinetuning = async () => {
+    if (!selectedChat) return
+
+    try {
+      const response = await fetch(`${API_URL}/finetune`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          modelName: chatSettings.modelName,
+          chatHistory: messages.filter((m) => m.role !== 'system')
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to initiate fine-tuning: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // Add system message about fine-tuning
+      const fineTuningMessage: Message = {
+        role: 'system',
+        content:
+          data.message ||
+          '**Fine-tuning initiated.** This process will analyze your chat history to improve future responses.',
+        timestamp: Date.now()
+      }
+
+      const updatedMessages = [...messages, fineTuningMessage]
+      setMessages(updatedMessages)
+      saveMessages(updatedMessages)
+
+      // Add job to fine-tuning jobs
+      if (data.job_id) {
+        setFineTuningJobs((prev) => ({
+          ...prev,
+          [data.job_id]: {
+            model: chatSettings.modelName,
+            status: 'processing',
+            progress: 0,
+            created_at: Date.now()
+          }
+        }))
+
+        // Start polling job status
+        pollFineTuningStatus(data.job_id)
+      }
+    } catch (error) {
+      console.error('Error initiating fine-tuning:', error)
+      const errorMessage: Message = {
+        role: 'system',
+        content: 'Error: Could not initiate fine-tuning. Please try again later.',
+        timestamp: Date.now()
+      }
+
+      const updatedMessages = [...messages, errorMessage]
+      setMessages(updatedMessages)
+      saveMessages(updatedMessages)
+    }
+  }
+
+  // Poll fine-tuning job status
+  const pollFineTuningStatus = async (jobId: string) => {
+    try {
+      const response = await fetch(`${API_URL}/finetune/${jobId}`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch fine-tuning status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      if (data.success && data.job) {
+        setFineTuningJobs((prev) => ({
+          ...prev,
+          [jobId]: data.job
+        }))
+
+        // Continue polling if job is still processing
+        if (data.job.status === 'processing') {
+          setTimeout(() => pollFineTuningStatus(jobId), 5000)
+        } else if (data.job.status === 'completed') {
+          // Add system message about completion
+          const completionMessage: Message = {
+            role: 'system',
+            content: `**Fine-tuning completed.** The model has been updated based on your chat history.`,
+            timestamp: Date.now()
+          }
+
+          const updatedMessages = [...messages, completionMessage]
+          setMessages(updatedMessages)
+          saveMessages(updatedMessages)
+        }
+      }
+    } catch (error) {
+      console.error('Error polling fine-tuning status:', error)
+    }
   }
 
   const sendMessage = async () => {
@@ -186,78 +351,33 @@ export const Interface = () => {
 
     try {
       // Simulate API call with more realistic delay (variable between 1-3 seconds)
-      const delay = 1000 + Math.random() * 2000
+      const response = await fetch(`${API_URL}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          message: userMessage.content,
+          history: messages.map((m) => ({ role: m.role, content: m.content })),
+          settings: chatSettings
+        })
+      })
 
-      setTimeout(() => {
-        const defaultResponses = [
-          `I'm a placeholder response from the ${chatSettings.modelName} model (Temperature: ${chatSettings.temperature}).`,
-          `When you connect your API, I'll be replaced with real responses from ${chatSettings.modelName}.`,
-          'This is a simulated response. Replace the sendMessage function with actual API calls.',
-          `Using ${chatSettings.modelName} (${
-            chatSettings.isTensorLinkConnected ? 'with' : 'without'
-          } TensorLink). This is a placeholder message.`,
-          `Your message was received by ${chatSettings.modelName}. Connect your API for real interactions.`
-        ]
-
-        const randomResponse = defaultResponses[Math.floor(Math.random() * defaultResponses.length)]
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: randomResponse,
-          timestamp: Date.now()
-        }
-
-        const updatedMessages = [...newMessages, assistantMessage]
-        setMessages(updatedMessages)
-        saveMessages(updatedMessages)
-        setIsLoading(false)
-        setIsSending(false)
-      }, delay)
-
-      /* 
-      // Uncomment and modify this code when your API is ready
-      try {
-        const response = await fetch('http://your-api-url/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            message: inputMessage,
-            history: messages.map(m => ({ role: m.role, content: m.content })),
-            settings: chatSettings
-          }),
-        });
-        
-        if (!response.ok) {
-          throw new Error(`API error: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Add assistant response with timestamp
-        const assistantMessage: Message = { 
-          role: 'assistant', 
-          content: data.response,
-          timestamp: Date.now() 
-        };
-        const updatedMessages = [...newMessages, assistantMessage];
-        setMessages(updatedMessages);
-        saveMessages(updatedMessages);
-      } catch (error) {
-        console.error('Error sending message:', error);
-        const errorMessage: Message = {
-          role: 'system',
-          content: 'Error: Could not process your message. Please try again later.',
-          timestamp: Date.now()
-        };
-        const updatedMessages = [...newMessages, errorMessage];
-        setMessages(updatedMessages);
-        saveMessages(updatedMessages);
-      } finally {
-        setIsLoading(false);
-        setIsSending(false);
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
       }
-      */
+
+      const data = await response.json()
+
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: data.response,
+        timestamp: Date.now()
+      }
+
+      const updatedMessages = [...newMessages, assistantMessage]
+      setMessages(updatedMessages)
+      saveMessages(updatedMessages)
     } catch (error) {
       console.error('Error sending message:', error)
       const errorMessage: Message = {
@@ -268,6 +388,7 @@ export const Interface = () => {
       const updatedMessages = [...newMessages, errorMessage]
       setMessages(updatedMessages)
       saveMessages(updatedMessages)
+    } finally {
       setIsLoading(false)
       setIsSending(false)
     }
@@ -378,14 +499,21 @@ export const Interface = () => {
           </div>
 
           <button
-            onClick={connectToTensorLink}
+            onClick={connectToTensorlink}
+            disabled={isConnectingTensorlink}
             className={`px-3 py-2 rounded-md text-sm ${
-              chatSettings.isTensorLinkConnected
-                ? 'bg-green-600 hover:bg-green-700 text-white'
-                : 'bg-gray-700 hover:bg-gray-600 text-white'
+              isConnectingTensorlink
+                ? 'bg-gray-600 text-white/70 cursor-not-allowed'
+                : chatSettings.isTensorlinkConnected
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-gray-700 hover:bg-gray-600 text-white'
             }`}
           >
-            {chatSettings.isTensorLinkConnected ? 'TensorLink ✓' : 'Connect TensorLink'}
+            {isConnectingTensorlink
+              ? 'Connecting...'
+              : chatSettings.isTensorlinkConnected
+                ? 'TensorLink ✓'
+                : 'Connect TensorLink'}
           </button>
         </div>
 
@@ -407,6 +535,13 @@ export const Interface = () => {
         >
           Fine-tune Model
         </button>
+        {/* <button
+          className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md text-sm"
+          onClick={initiateFinetuning}
+          disabled={!selectedChat || messages.filter(m => m.role !== 'system').length < 5}
+        >
+          Fine-tune Model
+        </button> */}
       </div>
 
       {/* Chat messages container */}

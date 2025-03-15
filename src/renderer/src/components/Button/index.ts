@@ -1,3 +1,5 @@
 export * from './ActionButton'
 export * from './DeleteChatButton'
+export * from './FineTuningButton'
 export * from './NewChatButton'
+export * from './SettingsButton'
