@@ -13,19 +13,22 @@ import { ChatContent } from '@shared/models'
 import { useSetAtom } from 'jotai'
 import { useEffect, useRef, useState } from 'react'
 
-const API_URL = 'http://127.0.0.1:5000/api'
+const API_URL = 'http://127.0.0.1:5053/api'
 
 interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp?: number
+  feedback?: 'positive' | 'negative' | null
+  modelName?: string
 }
 
 interface ChatSettings {
-  modelName: string
+  modelName?: string
   temperature: number
   maxTokens: number
   isTensorlinkConnected: boolean
+  isModelInitialized: false
 }
 
 interface Model {
@@ -45,17 +48,54 @@ export const Interface = () => {
   const [isConnectingTensorlink, setIsConnectingTensorlink] = useState(false)
   const [showTensorlinkModal, setShowTensorlinkModal] = useState(false)
   const [fineTuningJobs, setFineTuningJobs] = useState<Record<string, any>>({})
+  const [isInitializingModel, setIsInitializingModel] = useState(false)
+  const [showModelModal, setShowModelModal] = useState(true)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const settingsRef = useRef<HTMLDivElement>(null)
   const saveChat = useSetAtom(saveChatAtom)
+
+  // Check if we should show the initial modal
+  useEffect(() => {
+    // const hasSeenTensorlinkPrompt = localStorage.getItem('hasSeenTensorlinkPrompt')
+    if (!false) {
+      setShowTensorlinkModal(true)
+    } else {
+      setShowTensorlinkModal(false)
+    }
+  }, [])
+
+  // Add this function to handle the user's choice
+  const handleTensorlinkChoice = async (connect) => {
+    // Save that the user has seen this prompt
+    localStorage.setItem('hasSeenTensorlinkPrompt', 'true')
+
+    if (connect) {
+      // User chose to connect to Tensorlink
+      await connectToTensorlink()
+    } else {
+      // User chose to continue with limited capabilities
+      const infoMessage: Message = {
+        role: 'system',
+        content: 'You are using local capabilities only. Some advanced features may be limited.',
+        timestamp: Date.now()
+      }
+      const updatedMessages = [...messages, infoMessage]
+      setMessages(updatedMessages)
+      saveMessages(updatedMessages)
+    }
+
+    setShowTensorlinkModal(false)
+  }
 
   // Default chat settings
   const [chatSettings, setChatSettings] = useState<ChatSettings>({
     modelName: 'default-model',
     temperature: 0.7,
     maxTokens: 1024,
-    isTensorlinkConnected: false
+    isTensorlinkConnected: false,
+    isModelInitialized: false
   })
 
   // Fetch available models and tensorlink status
@@ -64,6 +104,16 @@ export const Interface = () => {
     checkTensorlinkStatus()
   }, [])
 
+  useEffect(() => {
+    // If the selected model doesn't exist in available models, select the first one
+    if (availableModels.length > 0) {
+      const modelExists = availableModels.some((model) => model.id === chatSettings.modelName)
+      if (!modelExists) {
+        setChatSettings((prev) => ({ ...prev, modelName: availableModels[0].id }))
+      }
+    }
+  }, [availableModels])
+
   // Initialize messages when selected chat changes
   useEffect(() => {
     if (selectedChat) {
@@ -71,6 +121,25 @@ export const Interface = () => {
         const parsedMessages = JSON.parse(selectedChat.content) as Message[]
         if (Array.isArray(parsedMessages)) {
           setMessages(parsedMessages)
+
+          const assistantMessages = parsedMessages.filter(
+            (m) => m.role === 'assistant' && m.modelName
+          )
+          if (assistantMessages.length > 0) {
+            // Use the latest assistant message's model
+            const latestMessage = assistantMessages[assistantMessages.length - 1]
+            if (latestMessage.modelName) {
+              setChatSettings((prev) => ({
+                ...prev,
+                modelName: latestMessage.modelName,
+                isModelInitialized: false
+              }))
+
+              if (chatSettings.isTensorlinkConnected) {
+                setShowModelModal(true)
+              }
+            }
+          }
         } else {
           setMessages([
             {
@@ -94,7 +163,7 @@ export const Interface = () => {
             {
               role: 'system',
               content:
-                '# Welcome to Chat Mode\n\nThis note has been converted to a chat interface. Type a message below to start chatting!',
+                '## Welcome to localhostGPT\n\nA private AI experience powered by local data and peer-to-peer computing. Select an existing chat or type a message below to start chatting!',
               timestamp: Date.now()
             }
           ])
@@ -244,7 +313,14 @@ export const Interface = () => {
         },
         body: JSON.stringify({
           modelName: chatSettings.modelName,
-          chatHistory: messages.filter((m) => m.role !== 'system')
+          chatHistory: messages.filter((m) => m.role !== 'system'),
+          feedbackData: messages
+            .filter((m) => m.role === 'assistant' && m.feedback)
+            .map((m) => ({
+              messageId: messages.indexOf(m),
+              feedback: m.feedback,
+              modelName: m.modelName
+            }))
         })
       })
 
@@ -341,16 +417,24 @@ export const Interface = () => {
     const userMessage: Message = {
       role: 'user',
       content: inputMessage,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      modelName: chatSettings.modelName
     }
+
     const newMessages = [...messages, userMessage]
+
     setMessages(newMessages)
     saveMessages(newMessages)
     setInputMessage('')
     setIsLoading(true)
-
+    console.log(
+      JSON.stringify({
+        message: userMessage.content,
+        history: messages.map((m) => ({ role: m.role, content: m.content })),
+        settings: chatSettings
+      })
+    )
     try {
-      // Simulate API call with more realistic delay (variable between 1-3 seconds)
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
         headers: {
@@ -372,7 +456,8 @@ export const Interface = () => {
       const assistantMessage: Message = {
         role: 'assistant',
         content: data.response,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        modelName: chatSettings.modelName
       }
 
       const updatedMessages = [...newMessages, assistantMessage]
@@ -392,6 +477,16 @@ export const Interface = () => {
       setIsLoading(false)
       setIsSending(false)
     }
+  }
+
+  const handleFeedback = (index: number, feedback: 'positive' | 'negative') => {
+    const updatedMessages = [...messages]
+    updatedMessages[index] = {
+      ...updatedMessages[index],
+      feedback: feedback
+    }
+    setMessages(updatedMessages)
+    saveMessages(updatedMessages)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -512,8 +607,8 @@ export const Interface = () => {
             {isConnectingTensorlink
               ? 'Connecting...'
               : chatSettings.isTensorlinkConnected
-                ? 'TensorLink ✓'
-                : 'Connect TensorLink'}
+                ? 'Tensorlink ✓'
+                : 'Connect Tensorlink'}
           </button>
         </div>
 
@@ -589,11 +684,66 @@ export const Interface = () => {
                 ]}
                 contentEditableClassName="outline-none max-w-none text-base prose prose-invert prose-p:my-1 prose-p:leading-relaxed prose-headings:my-2 prose-blockquote:my-2 prose-ul:my-1 prose-li:my-0 prose-code:px-1 prose-code:text-red-300 prose-code:before:content-[''] prose-code:after:content-['']"
               />
+              {/* Inside the message rendering map function */}
+              {message.role === 'assistant' && (
+                <div className="flex mt-2 space-x-2 justify-end">
+                  <button
+                    onClick={() => handleFeedback(index, 'positive')}
+                    className={`p-1 rounded ${
+                      message.feedback === 'positive'
+                        ? 'bg-green-600'
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                    aria-label="Good response"
+                    title="Mark as helpful"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => handleFeedback(index, 'negative')}
+                    className={`p-1 rounded ${
+                      message.feedback === 'negative'
+                        ? 'bg-red-600'
+                        : 'bg-gray-700 hover:bg-gray-600'
+                    }`}
+                    aria-label="Bad response"
+                    title="Mark as unhelpful"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.095c.5 0 .905-.405.905-.905 0-.714.211-1.412.608-2.006L17 13V4m-7 10h2"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ))}
 
-        {/* Loading indicator - improved animation */}
+        {/* Loading indicator */}
         {isLoading && (
           <div className="flex justify-start items-center my-4 pl-4">
             <div className="flex space-x-2">
@@ -686,6 +836,40 @@ export const Interface = () => {
           </div>
         )}
       </div>
+
+      {/* Your existing Tensorlink connection modal (if any) */}
+      {showTensorlinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full border border-white/20">
+            <h2 className="text-xl font-semibold text-white mb-4">Initialize Tensorlink?</h2>
+            <p className="text-white/80 mb-6">
+              Tensorlink enables larger and more advanced models by leveraging peer-to-peer
+              computation.
+            </p>
+            <p className="text-red-500 mb-6">Currently requires UPnP.</p>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowTensorlinkModal(false)}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-md"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={connectToTensorlink}
+                disabled={isConnectingTensorlink}
+                className={`px-4 py-2 rounded-md ${
+                  isConnectingTensorlink
+                    ? 'bg-gray-600 text-white/70 cursor-not-allowed'
+                    : 'bg-purple-600 hover:bg-purple-700 text-white'
+                }`}
+              >
+                {isConnectingTensorlink ? 'Connecting...' : 'Connect'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
