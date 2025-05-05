@@ -1,3 +1,3 @@
 # localhostGPT
 
-A desktop application for running and fine-tuning language models locally. Features P2P training capabilities, allowing users to customize models while maintaining data privacy and sovereignty. Currently under development and not connected to Tensorlink.
+A desktop and mobile app designed for running chatbots and other AI tools. By leveraging Tensorlink to offload compute across peers, localhostGPT combines cloud-level performance while giving you more control of your models and data.Currently under development.
