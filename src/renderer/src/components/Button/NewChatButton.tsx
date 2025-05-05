@@ -11,7 +11,7 @@ export const NewChatButton = ({ ...props }: ActionButtonProps) => {
   }
 
   return (
-    <ActionButton onClick={handleCreation} {...props} title="New Chat">
+    <ActionButton onClick={handleCreation} {...props} title="New Chat" className="bg-green-600">
       <LuFileSignature className="w-4 h-4 text-zinc-300" />
     </ActionButton>
   )

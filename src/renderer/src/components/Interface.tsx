@@ -20,7 +20,6 @@ interface Message {
   content: string
   timestamp?: number
   feedback?: 'positive' | 'negative' | null
-  modelName?: string
 }
 
 interface ChatSettings {
@@ -58,7 +57,7 @@ export const Interface = () => {
 
   // Check if we should show the initial modal
   useEffect(() => {
-    // const hasSeenTensorlinkPrompt = localStorage.getItem('hasSeenTensorlinkPrompt')
+    const hasSeenTensorlinkPrompt = sessionStorage.getItem('hasSeenTensorlinkPrompt')
     if (!false) {
       setShowTensorlinkModal(true)
     } else {
@@ -69,7 +68,7 @@ export const Interface = () => {
   // Add this function to handle the user's choice
   const handleTensorlinkChoice = async (connect) => {
     // Save that the user has seen this prompt
-    localStorage.setItem('hasSeenTensorlinkPrompt', 'true')
+    sessionStorage.setItem('hasSeenTensorlinkPrompt', 'true')
 
     if (connect) {
       // User chose to connect to Tensorlink
@@ -78,7 +77,7 @@ export const Interface = () => {
       // User chose to continue with limited capabilities
       const infoMessage: Message = {
         role: 'system',
-        content: 'You are using local capabilities only. Some advanced features may be limited.',
+        content: 'You are using local capabilities only. Some features will be limited.',
         timestamp: Date.now()
       }
       const updatedMessages = [...messages, infoMessage]
@@ -122,16 +121,14 @@ export const Interface = () => {
         if (Array.isArray(parsedMessages)) {
           setMessages(parsedMessages)
 
-          const assistantMessages = parsedMessages.filter(
-            (m) => m.role === 'assistant' && m.modelName
-          )
+          const assistantMessages = parsedMessages.filter((m) => m.role === 'assistant')
+
           if (assistantMessages.length > 0) {
-            // Use the latest assistant message's model
             const latestMessage = assistantMessages[assistantMessages.length - 1]
-            if (latestMessage.modelName) {
+            if (latestMessage) {
+              // Reset
               setChatSettings((prev) => ({
                 ...prev,
-                modelName: latestMessage.modelName,
                 isModelInitialized: false
               }))
 
@@ -174,7 +171,7 @@ export const Interface = () => {
         {
           role: 'system',
           content:
-            '# Select or create a chat\n\nPlease select an existing note or create a new one to start chatting.',
+            '## Select or create a chat\n\nPlease select an existing note or create a new one to start chatting.',
           timestamp: Date.now()
         }
       ])
@@ -242,7 +239,7 @@ export const Interface = () => {
   // Check Tensorlink connection status
   const checkTensorlinkStatus = async () => {
     try {
-      const response = await fetch(`${API_URL}/tensorlink/status`)
+      const response = await fetch(`${API_URL}/status`)
       if (!response.ok) {
         throw new Error(`Failed to check Tensorlink status: ${response.status}`)
       }
@@ -260,7 +257,7 @@ export const Interface = () => {
     // Placeholder for Tensorlink connection logic
     try {
       setIsConnectingTensorlink(true)
-      const response = await fetch(`${API_URL}/tensorlink/connect`)
+      const response = await fetch(`${API_URL}/connect`)
 
       if (!response.ok) {
         throw new Error(`Failed to connect to Tensorlink: ${response.status}`)
@@ -318,8 +315,7 @@ export const Interface = () => {
             .filter((m) => m.role === 'assistant' && m.feedback)
             .map((m) => ({
               messageId: messages.indexOf(m),
-              feedback: m.feedback,
-              modelName: m.modelName
+              feedback: m.feedback
             }))
         })
       })
@@ -417,8 +413,7 @@ export const Interface = () => {
     const userMessage: Message = {
       role: 'user',
       content: inputMessage,
-      timestamp: Date.now(),
-      modelName: chatSettings.modelName
+      timestamp: Date.now()
     }
 
     const newMessages = [...messages, userMessage]
@@ -427,13 +422,7 @@ export const Interface = () => {
     saveMessages(newMessages)
     setInputMessage('')
     setIsLoading(true)
-    console.log(
-      JSON.stringify({
-        message: userMessage.content,
-        history: messages.map((m) => ({ role: m.role, content: m.content })),
-        settings: chatSettings
-      })
-    )
+
     try {
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
@@ -456,8 +445,7 @@ export const Interface = () => {
       const assistantMessage: Message = {
         role: 'assistant',
         content: data.response,
-        timestamp: Date.now(),
-        modelName: chatSettings.modelName
+        timestamp: Date.now()
       }
 
       const updatedMessages = [...newMessages, assistantMessage]
@@ -630,13 +618,6 @@ export const Interface = () => {
         >
           Fine-tune Model
         </button>
-        {/* <button
-          className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md text-sm"
-          onClick={initiateFinetuning}
-          disabled={!selectedChat || messages.filter(m => m.role !== 'system').length < 5}
-        >
-          Fine-tune Model
-        </button> */}
       </div>
 
       {/* Chat messages container */}

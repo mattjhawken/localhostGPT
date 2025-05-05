@@ -8,6 +8,8 @@ import {
   FloatingChatTitle,
   Interface,
   RootLayout,
+  SettingsButton,
+  SettingsView,
   Sidebar
 } from '@/components'
 import { useRef, useState } from 'react'
@@ -29,7 +31,7 @@ const App = () => {
         <ActionButtonsRow className="flex-1" />
 
         <div className="flex space-x-1 ml-2">
-          {/* <SettingsButton currentView={currentView} setCurrentView={setCurrentView} /> */}
+          <SettingsButton currentView={currentView} setCurrentView={setCurrentView} />
           <FineTuneButton currentView={currentView} setCurrentView={setCurrentView} />
         </div>
       </div>
@@ -54,7 +56,7 @@ const App = () => {
         <Content ref={contentContainerRef} className="border-l bg-zinc-900/50 border-l-white/20">
           <FloatingChatTitle className="pt-2" />
           {currentView === 'chat' && <Interface />}
-          {/* {currentView === 'settings' && <SettingsView />} */}
+          {currentView === 'settings' && <SettingsView />}
           {currentView === 'fine-tuning' && <FineTuningView />}
         </Content>
       </RootLayout>

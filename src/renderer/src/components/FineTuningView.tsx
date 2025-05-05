@@ -1,5 +1,12 @@
 export const FineTuningView = () => (
-  <div className="py-5 px-3 text-white">
+  <div className="py-5 px-5 text-white">
+    <h1 className="mt-2 text-3xl font-bold mb-4">Welcome to localhostGPT</h1>
+
+    <div className="bg-gray-800 rounded-lg p-4 mb-6">
+      A private AI experience powered by local data and peer-to-peer computing. Users can access
+      large, personalized models with tunable features, while keeping their data secure and private.
+    </div>
+
     <h2 className="text-2xl font-bold mb-4">Fine-Tuning Models</h2>
 
     <div className="bg-gray-800 rounded-lg p-4 mb-6">
@@ -18,7 +25,7 @@ export const FineTuningView = () => (
     </div>
 
     <div className="space-y-6">
-      <div>
+      {/* <div>
         <h3 className="text-lg font-semibold mb-2">Training Data</h3>
         <div className="bg-gray-800 rounded-lg p-4 space-y-4">
           <div className="flex items-center">
@@ -51,7 +58,7 @@ export const FineTuningView = () => (
             </div>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <div>
         <h3 className="text-lg font-semibold mb-2">Fine-tuning Settings</h3>

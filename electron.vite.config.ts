@@ -10,10 +10,20 @@ export default defineConfig({
         '@/lib': resolve('src/main/lib'),
         '@shared': resolve('src/shared')
       }
+    },
+    server: {
+      watch: {
+        ignored: ['**/.env*']
+      }
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin()],
+    server: {
+      watch: {
+        ignored: ['**/.env*']
+      }
+    }
   },
   renderer: {
     assetsInclude: 'src/renderer/assets/**',
@@ -28,6 +38,11 @@ export default defineConfig({
         '@/mocks': resolve('src/renderer/src/mocks')
       }
     },
-    plugins: [react()]
+    plugins: [react()],
+    server: {
+      watch: {
+        ignored: ['**/.env*']
+      }
+    }
   }
 })

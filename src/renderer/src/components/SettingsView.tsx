@@ -31,12 +31,12 @@ export const SettingsView = () => (
       </div>
 
       <div>
-        <h3 className="text-lg font-semibold mb-2">TensorLink Connection</h3>
+        <h3 className="text-lg font-semibold mb-2">Tensorlink Connection</h3>
         <div className="bg-gray-800 rounded-lg p-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="font-medium">API Endpoint</div>
-              <div className="text-sm text-white/70">Configure your TensorLink connection</div>
+              <div className="text-sm text-white/70">Configure your Tensorlink connection</div>
             </div>
             <input
               type="text"
@@ -48,7 +48,7 @@ export const SettingsView = () => (
           <div className="mt-4 flex items-center justify-between">
             <div>
               <div className="font-medium">API Key</div>
-              <div className="text-sm text-white/70">Your TensorLink API key</div>
+              <div className="text-sm text-white/70">Your Tensorlink API key</div>
             </div>
             <input
               type="password"

@@ -34,7 +34,7 @@ export const SettingsButton = ({
           />
         </svg>
       </button>
-      <span className="absolute left-1/2 transform -translate-x-1/2 bottom-full mb-2 opacity-0 transition-opacity group-hover:opacity-100 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
+      <span className="absolute left-1/2 transform -translate-x-1/2 bottom-full -mb-16 mr-3 opacity-0 transition-opacity group-hover:opacity-100 bg-gray-800 text-white text-xs rounded px-2 py-1 whitespace-nowrap">
         Settings
       </span>
     </div>
