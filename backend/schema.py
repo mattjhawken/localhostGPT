@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel
 
@@ -20,6 +20,8 @@ class ChatRequest(BaseModel):
     history: List[HistoryItem]
     settings: ChatSettings
 
+class ChatResponse(BaseModel):
+    response: Any
 
 class FinetuneRequest(BaseModel):
     modelName: str

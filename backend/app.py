@@ -6,11 +6,10 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from routers.model import router as models_router
-from schema import ChatRequest
+from schema import ChatRequest, ChatResponse
 
 https_serv = "https://smartnodes.ddns.net/tensorlink-api"
 http_serv = "http://smartnodes.ddns.net/tensorlink-api"
-
 
 # Mock database for storing fine-tuning status
 fine_tuning_jobs = {}
@@ -23,20 +22,17 @@ tensorlink_status = {
 
 app = FastAPI()
 
-
-# Include both routers
-app.include_router(models_router)
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
+app.include_router(models_router)
 
-@app.post("/api/chat")
+@app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """Send message to the selected model."""    
     try:
@@ -44,9 +40,19 @@ async def chat(request: ChatRequest):
         model_name = request.settings.modelName
         temperature = request.settings.temperature
         history = request.history
-        history = [item.dict(exclude={'timestamp'}) for item in history]
         
-        # Get mock response using the function from models module
+        # Convert history to dict format
+        history_dicts = []
+        for item in history:
+            if hasattr(item, 'dict'):
+                history_dicts.append(item.dict(exclude={'timestamp'}))
+            else:
+                # If it's already a dict
+                history_dicts.append({
+                    "role": item.get("role", "user"),
+                    "content": item.get("content", "")
+                })
+        
         payload = {
             "hf_name": model_name,
             "message": input_text,
@@ -55,18 +61,37 @@ async def chat(request: ChatRequest):
             "temperature": temperature,
             "do_sample": True,
             "num_beams": 4,
-            "history": history
+            "history": history_dicts
         }
 
-        response = requests.post(f"{https_serv}/generate", json=payload)
-
-        print(response)
+        external_response = requests.post(f"{https_serv}/generate", json=payload)
         
-        return {"response": response}
+        print(f"External API status: {external_response.status_code}")
+        print(f"External API response: {external_response.text}")
+        
+        # Check if the external request was successful
+        if external_response.status_code != 200:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"External API error: {external_response.status_code}"
+            )
+        
+        # Extract JSON data from the response
+        try:
+            response_data = external_response.json()
+        except requests.exceptions.JSONDecodeError:
+            # If response isn't JSON, return the text
+            response_data = {"response": external_response.text}
+        
+        # Return in the format your frontend expects
+        return ChatResponse(response=response_data)
 
+    except requests.RequestException as e:
+        print(f"Network error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
     except Exception as e:
+        print(f"Unexpected error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @app.get("/api/connect")
 async def connect_tensorlink():

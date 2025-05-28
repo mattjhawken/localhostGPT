@@ -3,6 +3,7 @@ import { Message } from '../types/chat'
 
 export const useMessages = (selectedChat: any, saveChat: any) => {
   const [messages, setMessages] = useState<Message[]>([])
+  const [isInitialized, setIsInitialized] = useState(false)
 
   const getDefaultWelcomeMessage = (): Message => ({
     role: 'system',
@@ -14,21 +15,49 @@ export const useMessages = (selectedChat: any, saveChat: any) => {
   useEffect(() => {
     if (selectedChat) {
       try {
+        // Try to parse as JSON first (new format)
         const parsedMessages = JSON.parse(selectedChat.content) as Message[]
-        if (Array.isArray(parsedMessages)) {
+        if (Array.isArray(parsedMessages) && parsedMessages.length > 0) {
           setMessages(parsedMessages)
-        } else {
-          // Convert single content to system message
-          setMessages([
-            {
-              role: 'system',
-              content: 'Previous note converted to chat:\n\n' + selectedChat.content,
-              timestamp: Date.now()
-            }
-          ])
+          setIsInitialized(true)
+          return
         }
       } catch (e) {
-        if (selectedChat.content && selectedChat.content.trim()) {
+        // JSON parsing failed, try to handle legacy formats
+      }
+
+      // Handle legacy markdown format or plain text
+      if (selectedChat.content && selectedChat.content.trim()) {
+        // Check if it's the old markdown format
+        if (
+          selectedChat.content.includes('**user**:') ||
+          selectedChat.content.includes('**assistant**:')
+        ) {
+          // Parse markdown format back to messages
+          const messageBlocks = selectedChat.content.split('\n\n').filter((block) => block.trim())
+          const parsedMessages: Message[] = []
+
+          for (const block of messageBlocks) {
+            const match = block.match(/\*\*(user|assistant|system)\*\*:\s*([\s\S]*)/)
+            if (match) {
+              parsedMessages.push({
+                role: match[1] as 'user' | 'assistant' | 'system',
+                content: match[2].trim(),
+                timestamp: Date.now()
+              })
+            }
+          }
+
+          if (parsedMessages.length > 0) {
+            setMessages(parsedMessages)
+            // Convert to new JSON format
+            const content = JSON.stringify(parsedMessages)
+            saveChat(content)
+          } else {
+            setMessages([getDefaultWelcomeMessage()])
+          }
+        } else {
+          // Plain text content
           setMessages([
             {
               role: 'system',
@@ -36,41 +65,61 @@ export const useMessages = (selectedChat: any, saveChat: any) => {
               timestamp: Date.now()
             }
           ])
-        } else {
-          setMessages([getDefaultWelcomeMessage()])
         }
+      } else {
+        setMessages([getDefaultWelcomeMessage()])
       }
+      setIsInitialized(true)
     } else {
       setMessages([getDefaultWelcomeMessage()])
+      setIsInitialized(true)
     }
   }, [selectedChat])
 
   const saveMessages = async (newMessages: Message[]) => {
-    if (!selectedChat) return
-    const content = JSON.stringify(newMessages)
-    await saveChat(content)
+    if (!selectedChat || !isInitialized) return
+
+    try {
+      const content = JSON.stringify(newMessages, null, 2)
+      await saveChat(content)
+    } catch (error) {
+      console.error('Failed to save messages:', error)
+    }
   }
 
   const addMessage = (message: Message) => {
-    const newMessages = [...messages, message]
-    setMessages(newMessages)
-    saveMessages(newMessages)
-    return newMessages
+    setMessages((currentMessages) => {
+      const newMessages = [...currentMessages, message]
+      // Use setTimeout to avoid blocking the UI update
+      setTimeout(() => saveMessages(newMessages), 0)
+      return newMessages
+    })
+
+    // Return the new messages array for useChat compatibility
+    return [...messages, message]
   }
 
   const updateMessage = (index: number, updates: Partial<Message>) => {
+    setMessages((currentMessages) => {
+      const updatedMessages = [...currentMessages]
+      updatedMessages[index] = { ...updatedMessages[index], ...updates }
+      setTimeout(() => saveMessages(updatedMessages), 0)
+      return updatedMessages
+    })
+
     const updatedMessages = [...messages]
     updatedMessages[index] = { ...updatedMessages[index], ...updates }
-    setMessages(updatedMessages)
-    saveMessages(updatedMessages)
     return updatedMessages
   }
 
   const addMessages = (newMessages: Message[]) => {
-    const allMessages = [...messages, ...newMessages]
-    setMessages(allMessages)
-    saveMessages(allMessages)
-    return allMessages
+    setMessages((currentMessages) => {
+      const allMessages = [...currentMessages, ...newMessages]
+      setTimeout(() => saveMessages(allMessages), 0)
+      return allMessages
+    })
+
+    return [...messages, ...newMessages]
   }
 
   return {

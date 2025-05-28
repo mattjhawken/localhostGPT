@@ -77,15 +77,25 @@ export class ApiService {
     try {
       const response = await fetch(`${API_URL}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
         body: JSON.stringify({ message, history, settings })
       })
 
+      // Log response details for debugging
+      console.log('Response status:', response.status)
+      console.log('Response headers:', response.headers)
+
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`)
+        const errorText = await response.text()
+        console.error('API error response:', errorText)
+        throw new Error(`API error: ${response.status} - ${errorText}`)
       }
 
-      return await response.json()
+      const data = await response.json()
+      return data
     } catch (error) {
       console.error('Error sending message:', error)
       throw error

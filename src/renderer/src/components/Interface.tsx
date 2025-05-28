@@ -26,7 +26,7 @@ export const Interface = () => {
     isConnectingTensorlink,
     tensorlinkStats,
     connectToTensorlink,
-    getTensorlinkStats // <-- Make sure this is included
+    getTensorlinkStats
   } = useChatSettings()
 
   const { messages, addMessage, updateMessage } = useMessages(selectedChat, saveChat)
@@ -52,10 +52,13 @@ export const Interface = () => {
   const handleSendMessage = async () => {
     if (!selectedChat) return
 
-    const result = await sendMessage(inputMessage, messages, chatSettings, addMessage, (msgs) => {
-      msgs.forEach(addMessage)
-      return messages.concat(msgs)
-    })
+    // Simplified - let useMessages handle all saving
+    const result = await sendMessage(
+      inputMessage,
+      messages,
+      chatSettings,
+      addMessage // useMessages.addMessage will handle saving automatically
+    )
 
     if (result?.success) {
       setInputMessage('')
@@ -85,6 +88,7 @@ export const Interface = () => {
             setChatSettings={setChatSettings}
             availableModels={availableModels}
             showSettings={showSettings}
+            tensorlinkStats={tensorlinkStats}
             getTensorlinkStats={getTensorlinkStats}
             setShowSettings={setShowSettings}
             isConnectingTensorlink={isConnectingTensorlink}
