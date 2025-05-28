@@ -5,7 +5,7 @@ import { useChat } from '@renderer/hooks/useChat'
 import { useChatSettings } from '@renderer/hooks/useChatSettings'
 import { useMarkdownEditor } from '@renderer/hooks/useInterface'
 import { useMessages } from '@renderer/hooks/useMessages'
-import { saveChatAtom } from '@renderer/store'
+import { resetChatAtom, saveChatAtom } from '@renderer/store'
 import { Message } from '@renderer/types/chat'
 import { useSetAtom } from 'jotai'
 import { useEffect, useRef, useState } from 'react'
@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 export const Interface = () => {
   const { selectedChat } = useMarkdownEditor()
   const saveChat = useSetAtom(saveChatAtom)
+  const resetChat = useSetAtom(resetChatAtom)
   const [inputMessage, setInputMessage] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const settingsRef = useRef<HTMLDivElement>(null)
@@ -29,7 +30,7 @@ export const Interface = () => {
     getTensorlinkStats
   } = useChatSettings()
 
-  const { messages, addMessage, updateMessage } = useMessages(selectedChat, saveChat)
+  const { messages, addMessage, updateMessage, setMessages } = useMessages(selectedChat, saveChat)
 
   const { isLoading, isSending, sendMessage } = useChat()
 
@@ -78,6 +79,39 @@ export const Interface = () => {
     addMessage(systemMessage)
   }
 
+  const handleResetChat = async () => {
+    try {
+      await resetChat()
+
+      // Reset the messages in the UI to show the default welcome message
+      const getDefaultWelcomeMessage = (): Message => ({
+        role: 'system',
+        content:
+          '## Welcome to localhostGPT\n\nAn AI experience powered by local data and peer-to-peer computing with opt-in privacy enhancing features. Select an existing chat or create a new one to start chatting!',
+        timestamp: Date.now()
+      })
+
+      setMessages([getDefaultWelcomeMessage()])
+
+      // Optionally show a success message
+      const successMessage: Message = {
+        role: 'system',
+        content: 'Chat cleared successfully',
+        timestamp: Date.now()
+      }
+      setTimeout(() => addMessage(successMessage), 100)
+    } catch (error) {
+      console.error('Failed to reset chat:', error)
+      // Show error message
+      const errorMessage: Message = {
+        role: 'system',
+        content: 'Failed to reset chat',
+        timestamp: Date.now()
+      }
+      addMessage(errorMessage)
+    }
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Chat controls */}
@@ -94,6 +128,7 @@ export const Interface = () => {
             isConnectingTensorlink={isConnectingTensorlink}
             connectToTensorlink={connectToTensorlink}
             onConnectionResult={handleConnectionResult}
+            onResetChat={handleResetChat}
           />
         </div>
       </div>

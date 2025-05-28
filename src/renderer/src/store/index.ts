@@ -105,3 +105,43 @@ export const deleteChatAtom = atom(null, async (get, set) => {
   // de select any chat
   set(selectedChatIndexAtom, null)
 })
+
+export const resetChatAtom = atom(null, async (get, set) => {
+  const selectedChat = get(selectedChatAtom)
+
+  if (!selectedChat) return { success: false, message: 'No chat selected' }
+
+  try {
+    // Clear the chat content on disk by writing empty content
+    await window.context.writeChat(selectedChat.title, '')
+
+    // Update the selected chat atom to reflect the empty content
+    set(selectedChatAtom, {
+      ...selectedChat,
+      content: '',
+      lastEditTime: Date.now()
+    })
+
+    // Also update the chats list to reflect the new lastEditTime
+    const chats = get(chatsAtom)
+    if (chats) {
+      set(
+        chatsAtom,
+        chats.map((chat) => {
+          if (chat.title === selectedChat.title) {
+            return {
+              ...chat,
+              lastEditTime: Date.now()
+            }
+          }
+          return chat
+        })
+      )
+    }
+
+    return { success: true, message: 'Chat cleared successfully' }
+  } catch (error) {
+    console.error('Failed to reset chat:', error)
+    return { success: false, message: 'Failed to clear chat' }
+  }
+})

@@ -43,6 +43,9 @@ const App = () => {
       <DraggableTopBar />
       <RootLayout>
         <Sidebar className="p-2">
+          <div className="mb-4 mx-3">
+            <h2 className="text-xl font-bold">localhostGPT x tensorlink</h2>
+          </div>
           <EnhancedActionButtonsRow className="action-row flex items-center py-1 px-3" />
           <div>
             {/* Chat content would go here */}
