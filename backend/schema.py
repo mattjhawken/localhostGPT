@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Any, List, Optional
 
 from pydantic import BaseModel
@@ -17,12 +18,18 @@ class ChatSettings(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
-    history: List[HistoryItem]
     settings: ChatSettings
+
 
 class ChatResponse(BaseModel):
     response: Any
 
+
 class FinetuneRequest(BaseModel):
     modelName: str
     chatHistory: List[str]
+
+
+class InferenceMode(str, Enum):
+    API = "api"
+    PYTORCH = "pytorch"
