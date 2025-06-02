@@ -8,10 +8,8 @@ export const useChat = () => {
 
   const sendMessage = async (
     messageContent: string,
-    messages: Message[],
     settings: ChatSettings,
     onMessageAdd: (message: Message) => void
-    // Removed onSaveChat parameter - let useMessages handle saving
   ) => {
     if (!messageContent.trim() || isSending) return
 
@@ -23,17 +21,11 @@ export const useChat = () => {
       timestamp: Date.now()
     }
 
-    // Add user message to UI (useMessages will handle saving)
-    const updatedMessagesWithUser = onMessageAdd(userMessage)
-
+    onMessageAdd(userMessage)
     setIsLoading(true)
 
     try {
-      const response = await ApiService.sendChatMessage(
-        userMessage.content,
-        updatedMessagesWithUser.map((m) => ({ role: m.role, content: m.content })),
-        settings
-      )
+      const response = await ApiService.sendChatMessage(userMessage.content, settings)
 
       const responseText =
         typeof response.response === 'string'

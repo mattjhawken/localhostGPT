@@ -56,7 +56,6 @@ export const Interface = () => {
     // Simplified - let useMessages handle all saving
     const result = await sendMessage(
       inputMessage,
-      messages,
       chatSettings,
       addMessage // useMessages.addMessage will handle saving automatically
     )

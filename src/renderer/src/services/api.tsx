@@ -34,7 +34,7 @@ export class ApiService {
       if (!response.ok) {
         throw new Error(`Failed to fetch Tensorlink stats: ${response.status}`)
       }
-      const data = await response
+      const data = response
       console.log(data)
       return data
     } catch (error) {
@@ -71,7 +71,6 @@ export class ApiService {
 
   static async sendChatMessage(
     message: string,
-    history: Array<{ role: string; content: string }>,
     settings: ChatSettings
   ): Promise<{ response: string }> {
     try {
@@ -81,7 +80,7 @@ export class ApiService {
           'Content-Type': 'application/json',
           Accept: 'application/json'
         },
-        body: JSON.stringify({ message, history, settings })
+        body: JSON.stringify({ message, settings })
       })
 
       // Log response details for debugging

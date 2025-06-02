@@ -13,7 +13,7 @@ https_serv = "https://smartnodes.ddns.net/tensorlink-api"
 http_serv = "http://smartnodes.ddns.net/tensorlink-api"
 
 # Create router for model endpoints
-router = APIRouter(prefix="/api/models", tags=["models"])
+router = APIRouter(tags=["models"])
 
 # Model cache to avoid reloading
 model_cache = {}
@@ -52,12 +52,13 @@ def chat_with_model(_model, _tokenizer, question, max_length=256):
 
 
 # Router endpoint for getting available models
-@router.get("")
+@router.get("/models")
 async def get_models():
     """Return available models based on Tensorlink connection status."""
     response = requests.get(f"{https_serv}/stats")
     models = [
-        {"id": "Qwen/Qwen2.5-7B-Instruct", "name": "Qwen2.5-7B", "requires_tensorlink": True}
+        {"id": "Qwen/Qwen2.5-7B-Instruct", "name": "Qwen2.5-7B", "requires_tensorlink": True},
+        {"id": "Qwen/Qwen3-8B-Instruct", "name": "Qwen3-8B", "requires_tensorlink": True},
     ]
 
     # if response:
