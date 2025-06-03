@@ -1,49 +1,87 @@
-import json
-import os
 from typing import Any, Dict, List
 
-import markdown
 import requests
 from config.settings import settings
+from core.chat_retriever import chat_retriever
 from fastapi import HTTPException
 from schema import ChatResponse
 
 
 def load_chats():
-    home_dir = os.path.expanduser("~")
-    chat_dir = os.path.join(home_dir, "localhostGPT")
+    chat_retriever.load_chats()
 
-    if not os.path.exists(chat_dir):
-        return []
+
+def generate_prompt(query: str, max_tokens: int = 2000, min_similarity: float = 0.25) -> str:
+    """
+    Generate an augmented prompt with relevant chat history context.
     
-    chats = []
-    for file in os.listdir(chat_dir):
-        if file.endswith(".json"):
-            file_path = os.path.join(chat_dir, file)
-
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                
-                parsed_data = json.loads(content)
-                
-                messages = []
-                for message in parsed_data:
-                    if message.get("role", "system") != "system":
-                        messages.append(message)
-
-                chats.append(messages)
-
-            except Exception as e:
-                print(f"Error loading chat file {file}: {e}")
-                continue 
+    Args:
+        query: User's query
+        max_tokens: Maximum tokens to use for context
+        min_similarity: Minimum similarity score to include a result
     
-    return chats
+    Returns:
+        Augmented prompt with context
+    """
+    # Search chat history for relevant information
+    relevant_results = chat_retriever.search_relevant_history(query, k=5)
+    
+    if not relevant_results:
+        # No context available, return simple prompt
+        return f"USER QUERY: {query}"
+    
+    context_parts = []
+    total_tokens = 0
+    
+    # Filter by similarity threshold and token budget
+    for result in relevant_results:
+        # Skip results below similarity threshold
+        if result["similarity_score"] < min_similarity:
+            continue
+            
+        content_tokens = result["token_count"]
+        
+        # Check if adding this chunk would exceed token limit
+        if total_tokens + content_tokens <= max_tokens:
+            # Format context with metadata for better understanding
+            metadata = result.get("metadata", {})
+            context_header = f"[Similarity: {result['similarity_score']:.3f}"
+            
+            # Add useful metadata if available
+            if "conversation_id" in metadata:
+                context_header += f" | Chat: {metadata['conversation_id']}"
+            if "last_updated" in metadata:
+                # Format timestamp more readably
+                try:
+                    from datetime import datetime
+                    dt = datetime.fromisoformat(metadata['last_updated'].replace('Z', '+00:00'))
+                    context_header += f" | Date: {dt.strftime('%Y-%m-%d')}"
+                except:
+                    pass
+            
+            context_header += "]\n"
+            
+            context_parts.append(f"{context_header}{result['content'].strip()}\n---")
+            total_tokens += content_tokens
+        else:
+            # Token budget exceeded, stop adding context
+            break
+    
+    # Build final prompt
+    if context_parts:
+        context = "\n".join(context_parts)
+        prompt = f"""Answer the user query using your knowledge and the relevant chat history context below.
 
+RELEVANT CHAT HISTORY:
+{context}
 
-def embed_chats():
-    chats = load_chats()
-    all_chunks = []
+USER QUERY: {query}"""
+    else:
+        # No relevant context found (all below similarity threshold or too large)
+        prompt = f"USER QUERY: {query}"
+    
+    return prompt
+
 
 
 class InferenceEngine:
