@@ -30,7 +30,6 @@ async def chat(request: ChatRequest):
             # Return in the format your frontend expects
             return response_data
 
-
         # external_response = requests.post(f"{https_serv}/generate", json=payload)
         
         # print(f"External API status: {external_response.status_code}")
