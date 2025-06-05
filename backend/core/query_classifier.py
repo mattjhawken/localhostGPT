@@ -2,6 +2,7 @@ import json
 from typing import Dict
 
 import requests
+from config.prompts import classification_prompt
 from config.settings import settings
 
 
@@ -18,25 +19,17 @@ class QueryClassifier:
         Returns:
             Dict with 'needs_web_search' and 'needs_chat_history' booleans
         """
-        classification_prompt = f"""Analyze this user query and determine what information sources are needed. Consider:
-- Does this need current/real-time information from the internet? (news, weather, stock prices, recent events, etc.)
-- Does this reference previous conversations or personal context, or some unkown context that is likely buildling up off prior conversation?
-- Is this a general knowledge question that doesn't need additional context?
-Respond with only this JSON format: {{"needs_web_search": true/false, "needs_chat_history": true/false}}
-
-Query: "{query}"
-"""
 
         try:
             # Use your existing API call structure
             payload = {
                 "hf_name": self.model_name,
-                "message": classification_prompt,
+                "message": classification_prompt(query),
                 "max_length": 200,
                 "max_new_tokens": 50,
                 "temperature": 0.1,
-                "do_sample": True,
-                "num_beams": 2,
+                "do_sample": False,
+                "num_beams": 1,
                 "history": []
             }
 
