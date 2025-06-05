@@ -13,7 +13,7 @@ router = APIRouter(tags=["chat"])
 async def chat(request: ChatRequest):
     """Send message to the selected model."""    
     try:
-        input_text = request.message
+        message = request.message
         model_name = request.settings.modelName
         temperature = request.settings.temperature
         
@@ -22,35 +22,14 @@ async def chat(request: ChatRequest):
         if current_mode == InferenceMode.API:
             response_data = await inference_engine.api_inference(
                 model_name=model_name,
-                message=request.message,
-                temperature=request.settings.temperature,
+                message=message,
+                temperature=request.temperature,
                 # max_new_tokens=request.settings.max_new_tokens
             )
             
-            # Return in the format your frontend expects
             return response_data
 
-        # external_response = requests.post(f"{https_serv}/generate", json=payload)
-        
-        # print(f"External API status: {external_response.status_code}")
-        # print(f"External API response: {external_response.text}")
-        
-        # # Check if the external request was successful
-        # if external_response.status_code != 200:
-        #     raise HTTPException(
-        #         status_code=500, 
-        #         detail=f"External API error: {external_response.status_code}"
-        #     )
-        
-        # # Extract JSON data from the response
-        # try:
-        #     response_data = external_response.json()
-        # except requests.exceptions.JSONDecodeError:
-        #     # If response isn't JSON, return the text
-        #     response_data = {"response": external_response.text}
-        
-        # Return in the format your frontend expects
-        return ChatResponse(response=response_data)
+        # return ChatResponse(response=response_data)
 
     except requests.RequestException as e:
         print(f"Network error: {str(e)}")

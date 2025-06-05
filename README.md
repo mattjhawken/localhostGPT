@@ -5,13 +5,6 @@ A desktop application for running and fine-tuning language models and other AI m
 Currently under development.
 
 ````mermaid
-# localhostGPT
-
-A desktop application for running and fine-tuning language models and other AI models. Built on the peer-to-peer architecture of [Tensorlink](https://github.com/smartnodes-lab/tensorlink), `localhostGPT` enables users to access large, personalized models with memory, all while preserving personal data. This application combines cloud-level performance with the ownership and customization of local computing.
-
-Currently under development.
-
-```mermaid
 flowchart LR
     title(["localhostGPT Workflows"])
     A[User Input]

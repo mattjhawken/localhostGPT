@@ -25,6 +25,17 @@
       "presentation": {
         "hidden": true
       }
+    },
+    {
+      "name": "Debug FastAPI",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/backend/app.py",
+      "console": "integratedTerminal",
+      "args": ["-m", "uvicorn", "app:app", "--reload"],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      }
     }
   ],
   "compounds": [

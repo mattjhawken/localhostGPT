@@ -2,9 +2,10 @@ from typing import Any, Dict, List
 
 import requests
 from config.settings import settings
-from core.chat_retriever import chat_retriever
 from fastapi import HTTPException
 from schema import ChatResponse
+
+from backend.core.retriever import retriever
 
 
 class InferenceEngine:
@@ -21,7 +22,7 @@ class InferenceEngine:
         max_context_tokens: int = 2000,
         min_similarity: float = 0.25
     ) -> Dict[str, Any]:        
-        enhanced_message, retrieval_metadata = await chat_retriever.generate_intelligent_prompt(
+        enhanced_message, retrieval_metadata = await retriever.generate_intelligent_prompt(
             message, max_context_tokens, min_similarity
         )
         
